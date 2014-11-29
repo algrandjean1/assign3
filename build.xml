@@ -1,0 +1,236 @@
+<?xml version="1.0"?>
+<project name="Cst420 Sample Assignment 3."
+         default="targets" basedir="."
+         xmlns="antlib:org.apache.tools.ant">
+   <taskdef resource="cpptasks.tasks"/>
+   <taskdef resource="net/sf/antcontrib/antcontrib.properties"/>
+
+   <property name="hostId" value="localhost" />
+   <property name="regPort" value="2222" />
+   <property name="src" value="src" />
+   <property name="build" value="classes" />
+   <property name="lib" value="lib" />
+   <property name="java.src.dir" value="src/client/java"/>
+   <property name="cpp.src.dir" value="src/client/cpp"/>
+   <property name="build" value="classes"/>
+   <property name="dist.dir" value="bin"/>
+   <property name="obj.dir" value="obj"/>
+   <property name="doc.java" value="doc.java"/>
+   <property name="doc.cpp" value="doc.cpp"/>
+
+   <property environment="env"/>
+   <property name="user.name" value="${env.USERNAME}"/>
+
+   <target name="targets">
+      <echo message="Targets are clean, prepare, build.java.client, execute.java.client, execute.server, build.cpp.client, gen.and.jar.docs and targets"/>
+      <echo message="Execute with java -cp classes assign3.client.WaypointClient"/>
+      <echo message="os is: ${os.name}"/>
+   </target>
+
+   <path id="compile.classpath">
+      <pathelement location="${build}"/>
+      <pathelement location="${lib}/org.json-20140503.jar" />
+   </path>
+
+   <target name="prepare">
+      <mkdir dir="${build}" />
+      <mkdir dir="${doc.cpp}" />
+      <mkdir dir="${doc.java}" />
+      <mkdir dir="${dist.dir}" />
+      <mkdir dir="${obj.dir}" />
+      <if>
+         <isset property="env.USERNAME"/>
+         <then>
+            <echo message="detected username is: ${env.USERNAME}"/>
+         </then>
+      <elseif>
+         <isset property="env.USER"/>
+         <then>
+            <echo message="detected user is: ${env.USER}"/>
+         </then>
+      </elseif>
+      </if>
+      <echo message="host name is: ${os.name}"/>
+      <echo message="host arch is: ${os.arch}"/>
+      <echo message="host version is: ${os.version}"/>
+      <echo message="base directory is: ${basedir}"/>
+
+      <!-- Platform identification -->
+      <condition property="build.host.islinux">
+        <and>
+          <os family="unix" />
+          <not>
+            <contains string="${os.name}" substring="mac"
+                      casesensitive="false" />
+          </not>
+        </and>
+      </condition>
+      <condition property="build.host.platform" value="linux">
+        <isset property="build.host.islinux" />
+      </condition>
+      <condition property="build.host.ismac">
+        <and>
+          <os family="unix" />
+          <contains string="${os.name}" substring="mac" casesensitive="false"/>
+        </and>
+      </condition>
+      <condition property="build.host.platform" value="mac">
+        <isset property="build.host.ismac" />
+      </condition>
+      <condition property="build.host.iswindows">
+        <os family="windows" />
+      </condition>
+      <condition property="build.host.platform" value="windows">
+        <isset property="build.host.iswindows" />
+      </condition>
+      <fail unless="build.host.platform"
+            message="Building on ${os.name} is not supported" />
+      <echo message="build.host.platform is: ${build.host.platform}"/>
+
+      <if>
+         <isset property="build.host.ismac"/>
+         <then>
+            <echo message="detected a mac host"/>
+            <property name="compiler.arg" value="-std=c++0x"/>
+            <property name="include.base" value="/"/>
+            <property name="include.paths" value="opt/local/include,usr/local/include"/>
+            <property name="linkflag" value=""/>
+            <property name="lib.list" value="stdc++,fltk"/>
+            <property name="lib.dir" value="/opt/local/lib"/>
+         </then>
+      <elseif>
+         <isset property="build.host.iswindows"/>
+         <then>
+            <echo message="detected a windows host"/>
+            <property name="compiler.arg" value="-std=c++0x"/>
+            <property name="lib.list" value="fltk,stdc++"/>
+         </then>
+      </elseif>
+      <elseif>
+         <isset property="build.host.islinux"/>
+         <then>
+            <echo message="detected a linux host"/>
+            <property name="compiler.arg" value="-std=c++0x"/>
+            <property name="lib.list" value="fltk,stdc++"/>
+            <property name="lib.dir" value="/usr/lib/x86_64-linux-gnu/"/>
+            <property name="include.paths" value="usr/include,usr/local/include"/>
+            <property name="include.base" value="/"/>
+            <property name="linkflag" value=""/>
+         </then>
+      </elseif>
+      </if>
+   </target>
+
+   <target name="clean">
+      <delete dir="${build}" failonerror="false"/>
+      <delete dir="${doc.java}" failonerror="false"/>
+      <delete dir="${doc.cpp}" failonerror="false"/>
+      <delete dir="${obj.dir}" failonerror="false"/>
+      <delete dir="${dist.dir}" failonerror="false"/>
+      <delete file="docs.jar" failonerror="false"/>
+   </target>
+
+   <target name="build.java.client" depends="prepare">
+      <javac srcdir="${java.src.dir}"
+             includeantruntime="false"
+             destdir="${build}">
+         <classpath refid="compile.classpath"/>
+      </javac>
+   </target>
+
+   <target name="execute.java.client" depends="build.java.client"
+           description="Run the program">
+         <echo message="command line execute: java -cp classes assign3.client.WaypointClient" />
+         <java classname="assign3.client.WaypointClient" fork="yes">
+           <classpath refid="compile.classpath"/>
+           <arg value="${user.name}"/>
+         </java>
+   </target>
+
+   <target name="build.cpp.client" depends="prepare">
+      <echo message="include.paths rooted at / are ${include.paths}"/>
+      <echo message="compiler arg is: ${compiler.arg}"/>
+      <if>
+        <equals arg1="${build.host.platform}" arg2="windows"/>
+        <then>
+            <cc outtype="executable" subsystem="console"
+                outfile="${dist.dir}/waypoint.exe"
+                objdir="${obj.dir}">
+                <compilerarg value="${compiler.arg}"/>
+                <libset libs="${lib.list}"/>
+                <fileset dir="${cpp.src.dir}" includes="WaypointGUI.cpp,samplemain.cpp"/>
+            </cc>
+        </then>
+        <else>
+          <cc outtype="executable" subsystem="console"
+              outfile="${dist.dir}/waypoint"
+              objdir="${obj.dir}">
+              <compilerarg value="${compiler.arg}"/>
+              <includepath>
+                 <dirset dir="${include.base}" includes="${include.paths}"/>
+              </includepath>
+              <linkerarg value="${linkflag}"/>
+              <libset dir="${lib.dir}" libs="${lib.list}"/>
+              <fileset dir="${cpp.src.dir}" includes="WaypointGUI.cpp,samplemain.cpp"/>
+         </cc>
+        </else>
+      </if>
+   </target>
+
+   <target name="gen.and.jar.docs" depends="build.java.client">
+      <echo message="for javadocs open doc.java/index.html"/>
+      <echo message="for C++ docs open doc.cpp/html/index.html"/>
+      <javadoc
+            defaultexcludes="yes"
+            destdir="${doc.java}"
+            author="true"
+            version="true"
+            use="true"
+            windowtitle="Class WaypointGUI">
+         <classpath refid="compile.classpath"/>
+         <fileset dir="${basedir}" casesensitive="yes">
+             <include name="src/java/WaypointGUI.java"/>
+         </fileset>
+      </javadoc>
+      <exec dir="${basedir}"
+            executable="doxygen">
+      </exec>
+      <jar destfile="${basedir}/docs.jar">
+         <fileset dir="${basedir}" includes="doc.java/*,doc.java/*/*,doc.java/*/*/*,doc.cpp/html/*"/>
+      </jar>
+   </target>
+   
+   <target name="execute.server" depends="prepare" description="Using parallel task, start server and client">
+       <!-- Compiles Java into classes -->
+       <javac srcdir="${src}" includeantruntime="false" destdir="${build}">
+           <classpath refid="compile.classpath" />
+       </javac>
+       
+       <!-- Compiles RMI into classes -->
+       <rmic classname="assign3.server.WaypointServerImpl" base="${build}">
+           <classpath refid="compile.classpath" />
+       </rmic>
+       
+       <parallel>
+           <exec dir="${basedir}" executable="${java.home}/bin/rmiregistry.exe" osfamily="windows">
+               <arg value="${regPort}" />
+               <env key="CLASSPATH" path="${basedir}/${build}" />
+           </exec>
+           <exec dir="${basedir}" executable="rmiregistry" osfamily="unix">
+               <arg value="${regPort}" />
+               <env key="CLASSPATH" path="${basedir}/${build}" />
+           </exec>
+           <sequential>
+               <sleep seconds="10" />
+               <java classname="assign3.server.WaypointServerImpl" fork="yes">
+                   <sysproperty key="java.security.policy" value="policyServer" />
+                   <sysproperty key="java.rmi.server.hostname" value="${hostId}" />
+                   <arg value="${hostId}" />
+                   <arg value="${regPort}" />
+                   <classpath refid="compile.classpath" />
+               </java>
+           </sequential>
+       </parallel>
+   </target>
+
+</project>
